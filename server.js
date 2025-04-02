@@ -6,18 +6,15 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use(limiter);
 
-// Конфигурация (лучше хранить в .env)
 const config = {
   PRIVATE_KEY: process.env.PRIVATE_KEY || 'ваш_приватный_ключ',
   PROVIDER_URL: process.env.PROVIDER_URL || 'https://testnet-rpc.monad.xyz',
@@ -25,7 +22,6 @@ const config = {
   PORT: process.env.PORT || 3000
 };
 
-// ABI токена (минимум необходимых функций)
 const TOKEN_ABI = [
   {
     "constant": false,
@@ -53,7 +49,6 @@ const TOKEN_ABI = [
   }
 ];
 
-// Инициализация провайдера и контракта
 let provider;
 let wallet;
 let tokenContract;
@@ -73,7 +68,6 @@ try {
   process.exit(1);
 }
 
-// Проверка балансов при старте
 async function checkBalances() {
   try {
     const ethBalance = await provider.getBalance(wallet.address);
@@ -89,7 +83,6 @@ async function checkBalances() {
   }
 }
 
-// Проверка работы сервера
 app.get('/ping', (req, res) => {
   res.json({ 
     status: 'active',
@@ -99,10 +92,9 @@ app.get('/ping', (req, res) => {
   });
 });
 
-// Отправка токенов
 app.post('/send-tokens', async (req, res) => {
   try {
-    // Валидация входных данных
+
     if (!req.body.address || !req.body.points) {
       return res.status(400).json({
         success: false,
@@ -110,7 +102,6 @@ app.post('/send-tokens', async (req, res) => {
       });
     }
 
-    // Проверка адреса
     if (!ethers.utils.isAddress(req.body.address)) {
       return res.status(400).json({
         success: false,
@@ -128,11 +119,11 @@ app.post('/send-tokens', async (req, res) => {
 
     console.log(`Sending ${points} tokens to ${req.body.address}`);
 
-    // Получаем decimals токена
+
     const decimals = await tokenContract.decimals();
     const amount = ethers.utils.parseUnits(points.toString(), decimals);
 
-    // Проверяем баланс
+   
     const balance = await tokenContract.balanceOf(wallet.address);
     if (balance.lt(amount)) {
       return res.status(400).json({
@@ -141,11 +132,10 @@ app.post('/send-tokens', async (req, res) => {
       });
     }
 
-    // Отправляем транзакцию
+
     const tx = await tokenContract.transfer(req.body.address, amount);
     console.log('Transaction sent, hash:', tx.hash);
 
-    // Ждем подтверждения (можно убрать для более быстрого ответа)
     const receipt = await tx.wait();
     console.log('Transaction confirmed in block:', receipt.blockNumber);
 
@@ -165,7 +155,6 @@ app.post('/send-tokens', async (req, res) => {
   }
 });
 
-// Обработка ошибок
 app.use((err, req, res, next) => {
   console.error('Global error:', err);
   res.status(500).json({ 
@@ -174,7 +163,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Запуск сервера
+
 app.listen(config.PORT, async () => {
   console.log(`Server running on port ${config.PORT}`);
   await checkBalances();
@@ -186,5 +175,4 @@ app.listen(config.PORT, async () => {
   console.log(`-d '{"address":"0xRECIPIENT","points":100}'`);
 });
 
-// Проверка балансов каждые 5 минут
 setInterval(checkBalances, 5 * 60 * 1000);
